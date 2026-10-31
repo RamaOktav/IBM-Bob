@@ -1,0 +1,348 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Gudang Hub — Manajemen Stok</title>
+  <link rel="stylesheet" href="style.css" />
+</head>
+<body>
+
+<!-- ══════════════════════════════════════
+     NAVBAR
+══════════════════════════════════════ -->
+<nav class="navbar" role="banner">
+  <div class="navbar-brand">
+    <svg fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24" aria-hidden="true">
+      <path stroke-linecap="round" stroke-linejoin="round"
+        d="M20 7l-8-4-8 4m16 0v10a2 2 0 01-2 2H6a2 2 0 01-2-2V7m16 0l-8 4-8-4"/>
+    </svg>
+    <span>Gudang Hub</span>
+  </div>
+  <div class="navbar-right">
+    <!-- Peringatan stok rendah badge -->
+    <div id="alertBadge" class="alert-badge" style="display:none" title="Ada stok yang perlu perhatian">
+      <svg width="15" height="15" fill="none" stroke="currentColor" stroke-width="2.2" viewBox="0 0 24 24" aria-hidden="true">
+        <path stroke-linecap="round" stroke-linejoin="round" d="M12 9v4m0 4h.01M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z"/>
+      </svg>
+      <span id="alertBadgeCount">0</span> Peringatan
+    </div>
+    <button class="btn btn-primary" onclick="openAddModal()" aria-label="Tambah barang baru">
+      <svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24" aria-hidden="true">
+        <path stroke-linecap="round" stroke-linejoin="round" d="M12 4v16m8-8H4"/>
+      </svg>
+      Tambah Barang
+    </button>
+  </div>
+</nav>
+
+<!-- Toast notifications container -->
+<div class="toasts" id="toastContainer" role="status" aria-live="polite"></div>
+
+<!-- ══════════════════════════════════════
+     MAIN CONTENT
+══════════════════════════════════════ -->
+<main class="container" role="main">
+
+  <!-- STATS CARDS -->
+  <section class="stats-grid" id="statsGrid" aria-label="Ringkasan stok"></section>
+
+  <!-- STOCK ALERT BANNER (tampil bila ada stok bermasalah) -->
+  <div id="alertBanner" class="alert-banner" style="display:none" role="alert" aria-live="assertive">
+    <div class="alert-banner-inner">
+      <svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="2.2" viewBox="0 0 24 24" aria-hidden="true">
+        <path stroke-linecap="round" stroke-linejoin="round" d="M12 9v4m0 4h.01M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z"/>
+      </svg>
+      <span id="alertBannerText">Ada barang dengan stok bermasalah.</span>
+    </div>
+    <button class="alert-banner-btn" onclick="filterToAlerts()" aria-label="Tampilkan barang bermasalah">Tampilkan</button>
+  </div>
+
+  <!-- TABS -->
+  <div class="tabs" role="tablist" aria-label="Navigasi halaman">
+    <button class="tab active" role="tab" aria-selected="true"  onclick="switchTab('stock', this)">
+      <svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" d="M20 7l-8-4-8 4m16 0v10a2 2 0 01-2 2H6a2 2 0 01-2-2V7m16 0l-8 4-8-4"/></svg>
+      Stok Barang
+    </button>
+    <button class="tab" role="tab" aria-selected="false" onclick="switchTab('log', this)">
+      <svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2"/></svg>
+      Log Aktivitas
+    </button>
+    <button class="tab" role="tab" aria-selected="false" onclick="switchTab('categories', this)">
+      <svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" d="M7 7h10M7 12h10M7 17h5"/></svg>
+      Kategori &amp; Tag
+    </button>
+  </div>
+
+  <!-- ═══ TAB: STOK BARANG ═══ -->
+  <section id="tab-stock" role="tabpanel" aria-label="Stok Barang">
+    <div class="toolbar">
+      <!-- Search -->
+      <div class="search-box">
+        <svg class="icon" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24" aria-hidden="true">
+          <circle cx="11" cy="11" r="8"/><path stroke-linecap="round" d="M21 21l-4.35-4.35"/>
+        </svg>
+        <input type="search" placeholder="Cari nama, kode SKU, atau tag…" id="searchInput"
+               oninput="renderTable()" aria-label="Cari barang" />
+      </div>
+      <!-- Filter Kategori -->
+      <select class="filter" id="filterCategory" onchange="renderTable()" aria-label="Filter kategori">
+        <option value="">Semua Kategori</option>
+      </select>
+      <!-- Filter Status Stok -->
+      <select class="filter" id="filterStock" onchange="renderTable()" aria-label="Filter status stok">
+        <option value="">Semua Status</option>
+        <option value="empty">Stok Habis (0)</option>
+        <option value="low">Stok Rendah</option>
+        <option value="ok">Stok Aman</option>
+      </select>
+      <!-- Filter Tag -->
+      <select class="filter" id="filterTag" onchange="renderTable()" aria-label="Filter tag">
+        <option value="">Semua Tag</option>
+      </select>
+    </div>
+
+    <!-- Tabel stok -->
+    <div class="card">
+      <table aria-label="Daftar stok barang">
+        <thead>
+          <tr>
+            <th class="sortable" id="th-name" onclick="toggleSort('name')">
+              Barang <span class="sort-arrow" id="arrow-name">↕</span>
+            </th>
+            <th>Kategori</th>
+            <th class="hide-sm">Tag</th>
+            <th class="hide-md">Lokasi</th>
+            <th class="sortable" id="th-qty" onclick="toggleSort('qty')">
+              Stok <span class="sort-arrow" id="arrow-qty">↕</span>
+            </th>
+            <th>Aksi</th>
+          </tr>
+        </thead>
+        <tbody id="stockTableBody"></tbody>
+      </table>
+    </div>
+  </section>
+
+  <!-- ═══ TAB: LOG AKTIVITAS ═══ -->
+  <section id="tab-log" role="tabpanel" aria-label="Log Aktivitas" style="display:none">
+    <div class="toolbar">
+      <div class="search-box">
+        <svg class="icon" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24" aria-hidden="true">
+          <circle cx="11" cy="11" r="8"/><path stroke-linecap="round" d="M21 21l-4.35-4.35"/>
+        </svg>
+        <input type="search" placeholder="Cari log…" id="logSearchInput"
+               oninput="renderLog()" aria-label="Cari log" />
+      </div>
+      <select class="filter" id="filterLogType" onchange="renderLog()" aria-label="Filter jenis log">
+        <option value="">Semua Jenis</option>
+        <option value="in">Barang Masuk</option>
+        <option value="out">Barang Keluar</option>
+        <option value="new">Barang Baru</option>
+        <option value="edit">Perubahan Data</option>
+        <option value="delete">Hapus Barang</option>
+      </select>
+      <button class="btn btn-outline btn-sm" onclick="clearLog()">
+        <svg width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/></svg>
+        Bersihkan Log
+      </button>
+    </div>
+    <div class="card">
+      <table class="log-table" aria-label="Log aktivitas gudang">
+        <thead>
+          <tr>
+            <th>Waktu</th>
+            <th>Jenis</th>
+            <th>Barang</th>
+            <th class="hide-sm">Detail</th>
+            <th class="hide-md">Petugas</th>
+          </tr>
+        </thead>
+        <tbody id="logTableBody"></tbody>
+      </table>
+    </div>
+  </section>
+
+  <!-- ═══ TAB: KATEGORI & TAG ═══ -->
+  <section id="tab-categories" role="tabpanel" aria-label="Kategori dan Tag" style="display:none">
+    <div class="cat-grid">
+
+      <!-- Kategori -->
+      <div class="card cat-card">
+        <div class="cat-card-header">
+          <h2 class="cat-card-title">Kategori</h2>
+        </div>
+        <div class="cat-card-body">
+          <div class="cat-add-row">
+            <input type="text" id="newCategoryInput" placeholder="Nama kategori baru…"
+                   class="cat-input" aria-label="Nama kategori baru"
+                   onkeydown="if(event.key==='Enter') addCategory()" />
+            <button class="btn btn-primary btn-sm" onclick="addCategory()">Tambah</button>
+          </div>
+          <div id="categoryList" class="cat-item-list"></div>
+        </div>
+      </div>
+
+      <!-- Tag -->
+      <div class="card cat-card">
+        <div class="cat-card-header">
+          <h2 class="cat-card-title">Tag</h2>
+        </div>
+        <div class="cat-card-body">
+          <div class="cat-add-row">
+            <input type="text" id="newTagInput" placeholder="Nama tag baru…"
+                   class="cat-input" aria-label="Nama tag baru"
+                   onkeydown="if(event.key==='Enter') addTag()" />
+            <button class="btn btn-primary btn-sm" onclick="addTag()">Tambah</button>
+          </div>
+          <div id="tagList" class="cat-item-list"></div>
+        </div>
+      </div>
+
+    </div>
+  </section>
+
+</main>
+
+<!-- ══════════════════════════════════════
+     MODAL: TAMBAH / EDIT BARANG
+══════════════════════════════════════ -->
+<div class="modal-backdrop" id="itemModal" role="dialog" aria-modal="true" aria-labelledby="itemModalTitle">
+  <div class="modal">
+    <button class="modal-close" onclick="closeModal('itemModal')" aria-label="Tutup">
+      <svg width="18" height="18" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12"/></svg>
+    </button>
+    <div class="modal-title" id="itemModalTitle">Tambah Barang</div>
+    <input type="hidden" id="editId" />
+
+    <!-- Upload gambar -->
+    <div class="form-row">
+      <label>Gambar Barang</label>
+      <div class="img-upload" id="imgUploadArea"
+           onclick="document.getElementById('imgFileInput').click()"
+           ondragover="event.preventDefault();this.classList.add('dragover')"
+           ondragleave="this.classList.remove('dragover')"
+           ondrop="handleImgDrop(event)"
+           role="button" tabindex="0" aria-label="Klik atau seret gambar">
+        <div id="imgPlaceholder">
+          <svg width="32" height="32" fill="none" stroke="currentColor" stroke-width="1.5" viewBox="0 0 24 24" style="margin:auto;opacity:.35;" aria-hidden="true">
+            <rect x="3" y="3" width="18" height="18" rx="2"/>
+            <circle cx="8.5" cy="8.5" r="1.5"/>
+            <path stroke-linecap="round" stroke-linejoin="round" d="M21 15l-5-5L5 21"/>
+          </svg>
+          <div class="upload-text">Klik atau seret gambar ke sini<br><small>JPG, PNG, WebP — maks 2 MB</small></div>
+        </div>
+        <img id="imgPreview" class="preview" style="display:none;" alt="Pratinjau gambar" />
+        <input type="file" id="imgFileInput" accept="image/*" style="display:none;" onchange="handleImgInput(event)" />
+      </div>
+      <button class="btn btn-outline btn-sm" style="margin-top:6px" onclick="clearImg()">Hapus Gambar</button>
+    </div>
+
+    <div class="form-grid2">
+      <div class="form-row">
+        <label for="f_name">Nama Barang <span class="required">*</span></label>
+        <input type="text" id="f_name" placeholder="Nama barang" />
+      </div>
+      <div class="form-row">
+        <label for="f_sku">Kode SKU</label>
+        <input type="text" id="f_sku" placeholder="ELK-001" />
+      </div>
+    </div>
+    <div class="form-grid2">
+      <div class="form-row">
+        <label for="f_category">Kategori <span class="required">*</span></label>
+        <select id="f_category">
+          <option value="">-- Pilih Kategori --</option>
+        </select>
+      </div>
+      <div class="form-row">
+        <label for="f_location">Lokasi Rak</label>
+        <input type="text" id="f_location" placeholder="A1-R3" />
+      </div>
+    </div>
+    <div class="form-row">
+      <label for="f_tags">Tag <small class="label-hint">(pisahkan dengan koma)</small></label>
+      <input type="text" id="f_tags" placeholder="elektronik, fragile, impor" />
+    </div>
+    <div class="form-grid2">
+      <div class="form-row">
+        <label for="f_qty">Stok Awal</label>
+        <input type="number" id="f_qty" placeholder="0" min="0" value="0" />
+      </div>
+      <div class="form-row">
+        <label for="f_minstock">Minimum Stok Alert</label>
+        <input type="number" id="f_minstock" placeholder="5" min="0" value="5" />
+      </div>
+    </div>
+    <div class="form-row">
+      <label for="f_note">Keterangan</label>
+      <textarea id="f_note" placeholder="Keterangan tambahan (opsional)"></textarea>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-outline" onclick="closeModal('itemModal')">Batal</button>
+      <button class="btn btn-primary" onclick="saveItem()">Simpan</button>
+    </div>
+  </div>
+</div>
+
+<!-- ══════════════════════════════════════
+     MODAL: SESUAIKAN STOK
+══════════════════════════════════════ -->
+<div class="modal-backdrop" id="adjustModal" role="dialog" aria-modal="true" aria-labelledby="adjustModalTitle">
+  <div class="modal modal-sm">
+    <button class="modal-close" onclick="closeModal('adjustModal')" aria-label="Tutup">
+      <svg width="18" height="18" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12"/></svg>
+    </button>
+    <div class="modal-title" id="adjustModalTitle">Kelola Stok</div>
+    <div id="adjustItemName" class="adjust-item-name"></div>
+
+    <!-- Pilih tipe: masuk / keluar -->
+    <div class="qty-type-btns" role="group" aria-label="Pilih tipe pergerakan stok">
+      <button class="qty-type-btn in active" id="btnTypeIn" onclick="setAdjustType('in')">
+        <svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" d="M5 12h14M12 5l7 7-7 7"/></svg>
+        Barang Masuk
+      </button>
+      <button class="qty-type-btn out" id="btnTypeOut" onclick="setAdjustType('out')">
+        <svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" d="M19 12H5M12 19l-7-7 7-7"/></svg>
+        Barang Keluar
+      </button>
+    </div>
+
+    <div class="form-row">
+      <label for="adjustQty">Jumlah</label>
+      <div class="qty-input-row">
+        <button class="stock-btn minus" onclick="changeAdjQty(-1)" aria-label="Kurangi jumlah">−</button>
+        <input type="number" id="adjustQty" value="1" min="1" aria-label="Jumlah" />
+        <button class="stock-btn plus" onclick="changeAdjQty(1)" aria-label="Tambah jumlah">+</button>
+      </div>
+    </div>
+    <div class="form-row">
+      <label for="adjustNote">Keterangan / Alasan</label>
+      <input type="text" id="adjustNote" placeholder="Pengiriman batch #12, retur, dll." />
+    </div>
+    <div class="form-row">
+      <label for="adjustUser">Nama Petugas</label>
+      <input type="text" id="adjustUser" placeholder="Nama petugas" />
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-outline" onclick="closeModal('adjustModal')">Batal</button>
+      <button class="btn btn-primary" id="adjustConfirmBtn" onclick="confirmAdjust()">Konfirmasi</button>
+    </div>
+  </div>
+</div>
+
+<!-- ══════════════════════════════════════
+     MODAL: DETAIL BARANG
+══════════════════════════════════════ -->
+<div class="modal-backdrop" id="viewModal" role="dialog" aria-modal="true" aria-labelledby="viewModalHeading">
+  <div class="modal modal-sm">
+    <button class="modal-close" onclick="closeModal('viewModal')" aria-label="Tutup">
+      <svg width="18" height="18" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12"/></svg>
+    </button>
+    <div id="viewModalContent"></div>
+  </div>
+</div>
+
+<script src="script.js"></script>
+</body>
+</html>
